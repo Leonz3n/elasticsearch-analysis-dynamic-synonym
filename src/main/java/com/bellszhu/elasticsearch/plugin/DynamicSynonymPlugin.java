@@ -35,60 +35,63 @@ import static java.util.Collections.singletonList;
  * @author bellszhu
  */
 public class DynamicSynonymPlugin extends Plugin implements AnalysisPlugin {
-    private PluginComponent pluginComponent = new PluginComponent();
 
-    @Override
-    public Collection<Object> createComponents(Client client,
-                                               ClusterService clusterService,
-                                               ThreadPool threadPool,
-                                               ResourceWatcherService resourceWatcherService,
-                                               ScriptService scriptService,
-                                               NamedXContentRegistry xContentRegistry,
-                                               Environment environment,
-                                               NodeEnvironment nodeEnvironment,
-                                               NamedWriteableRegistry namedWriteableRegistry) {
-        Collection<Object> components = new ArrayList<>();
-        components.add(pluginComponent);
-        return components;
+  private PluginComponent pluginComponent = new PluginComponent();
+
+  @Override
+  public Collection<Object> createComponents(Client client,
+      ClusterService clusterService,
+      ThreadPool threadPool,
+      ResourceWatcherService resourceWatcherService,
+      ScriptService scriptService,
+      NamedXContentRegistry xContentRegistry,
+      Environment environment,
+      NodeEnvironment nodeEnvironment,
+      NamedWriteableRegistry namedWriteableRegistry) {
+    Collection<Object> components = new ArrayList<>();
+    components.add(pluginComponent);
+    return components;
+  }
+
+  @Override
+  public Collection<Class<? extends LifecycleComponent>> getGuiceServiceClasses() {
+    return singletonList(DynamicSynonymAnalysisService.class);
+  }
+
+  @Override
+  public Map<String, AnalysisModule.AnalysisProvider<TokenFilterFactory>> getTokenFilters() {
+    Map<String, AnalysisModule.AnalysisProvider<org.elasticsearch.index.analysis.TokenFilterFactory>> extra = new HashMap<>();
+
+    extra.put("dynamic_synonym", new AnalysisModule.AnalysisProvider<TokenFilterFactory>() {
+
+      @Override
+      public TokenFilterFactory get(IndexSettings indexSettings, Environment environment,
+          String name, Settings settings)
+          throws IOException {
+        return new DynamicSynonymTokenFilterFactory(indexSettings, environment, name, settings,
+            pluginComponent.getAnalysisRegistry());
+      }
+
+      @Override
+      public boolean requiresAnalysisSettings() {
+        return true;
+      }
+    });
+    return extra;
+  }
+
+
+  public static class PluginComponent {
+
+    private AnalysisRegistry analysisRegistry;
+
+    AnalysisRegistry getAnalysisRegistry() {
+      return analysisRegistry;
     }
 
-    @Override
-    public Collection<Class<? extends LifecycleComponent>> getGuiceServiceClasses() {
-        return singletonList(DynamicSynonymAnalysisService.class);
+    public void setAnalysisRegistry(AnalysisRegistry analysisRegistry) {
+      this.analysisRegistry = analysisRegistry;
     }
 
-    @Override
-    public Map<String, AnalysisModule.AnalysisProvider<TokenFilterFactory>> getTokenFilters() {
-        Map<String, AnalysisModule.AnalysisProvider<org.elasticsearch.index.analysis.TokenFilterFactory>> extra = new HashMap<>();
-
-        extra.put("dynamic_synonym", new AnalysisModule.AnalysisProvider<TokenFilterFactory>() {
-
-            @Override
-            public TokenFilterFactory get(IndexSettings indexSettings, Environment environment, String name, Settings settings)
-                    throws IOException {
-                return new DynamicSynonymTokenFilterFactory(indexSettings, environment, name, settings, pluginComponent.getAnalysisRegistry());
-            }
-
-            @Override
-            public boolean requiresAnalysisSettings() {
-                return true;
-            }
-        });
-        return extra;
-    }
-
-
-    public static class PluginComponent {
-
-        private AnalysisRegistry analysisRegistry;
-
-        AnalysisRegistry getAnalysisRegistry() {
-            return analysisRegistry;
-        }
-
-        public void setAnalysisRegistry(AnalysisRegistry analysisRegistry) {
-            this.analysisRegistry = analysisRegistry;
-        }
-
-    }
+  }
 }
